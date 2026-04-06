@@ -68,8 +68,8 @@ test('undo and redo work for counter changes', async () => {
 
   const count = screen.getByTestId('count-value');
   const incrementBtn = screen.getByRole('button', { name: /increment/i });
-  const undoBtn = screen.getByRole('button', { name: /^undo$/i });
-  const redoBtn = screen.getByRole('button', { name: /^redo$/i });
+  const undoBtn = screen.getByRole('button', { name: /undo last action/i });
+  const redoBtn = screen.getByRole('button', { name: /redo last action/i });
 
   await user.click(incrementBtn);
   await user.click(incrementBtn);
