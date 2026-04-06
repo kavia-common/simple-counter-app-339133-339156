@@ -1,47 +1,56 @@
-import React, { useState, useEffect } from 'react';
-import logo from './logo.svg';
+import React, { useMemo, useState } from 'react';
 import './App.css';
 
 // PUBLIC_INTERFACE
 function App() {
-  const [theme, setTheme] = useState('light');
+  /** Main Counter App UI: shows current count and provides increment/decrement/reset actions. */
+  const [count, setCount] = useState(0);
 
-  // Effect to apply theme to document element
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+  // Keep formatting logic centralized and testable.
+  const formattedCount = useMemo(() => String(count), [count]);
 
   // PUBLIC_INTERFACE
-  const toggleTheme = () => {
-    setTheme(prevTheme => prevTheme === 'light' ? 'dark' : 'light');
-  };
+  const increment = () => setCount((c) => c + 1);
+
+  // PUBLIC_INTERFACE
+  const decrement = () => setCount((c) => c - 1);
+
+  // PUBLIC_INTERFACE
+  const reset = () => setCount(0);
 
   return (
     <div className="App">
-      <header className="App-header">
-        <button 
-          className="theme-toggle" 
-          onClick={toggleTheme}
-          aria-label={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-        >
-          {theme === 'light' ? '🌙 Dark' : '☀️ Light'}
-        </button>
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <p>
-          Current theme: <strong>{theme}</strong>
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      <main className="app-shell">
+        <section className="card" aria-label="Counter">
+          <header className="header">
+            <h1 className="title">Counter</h1>
+            <p className="subtitle">A simple, responsive counter with modern light styling.</p>
+          </header>
+
+          <div className="countWrap" aria-live="polite">
+            <div className="countLabel">Current count</div>
+            <div className="countValue" data-testid="count-value">
+              {formattedCount}
+            </div>
+          </div>
+
+          <div className="actions" role="group" aria-label="Counter controls">
+            <button type="button" className="btn btnPrimary" onClick={increment}>
+              Increment
+            </button>
+            <button type="button" className="btn btnSecondary" onClick={decrement}>
+              Decrement
+            </button>
+            <button type="button" className="btn btnGhost" onClick={reset}>
+              Reset
+            </button>
+          </div>
+
+          <footer className="footer">
+            <span className="hint">Tip: Works great on mobile and desktop.</span>
+          </footer>
+        </section>
+      </main>
     </div>
   );
 }
