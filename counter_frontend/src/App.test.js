@@ -1,95 +1,123 @@
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
 
-test('renders the counter with initial value 0', () => {
-  render(<App />);
+function renderApp() {
+  return render(<App />);
+}
+
+async function expectCountToBe(value) {
+  // In React 18, state updates can be async/batched; wait until DOM reflects the update.
+  await waitFor(() => {
+    expect(screen.getByTestId('count-value')).toHaveTextContent(String(value));
+  });
+}
+
+beforeEach(() => {
+  // Extra isolation beyond setupTests.js to prevent any leaking between tests,
+  // especially if a test fails before global hooks complete.
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  cleanup();
+  window.localStorage.clear();
+});
+
+test('renders the counter with initial value 0', async () => {
+  renderApp();
   expect(screen.getByRole('heading', { name: /counter/i })).toBeInTheDocument();
-  expect(screen.getByTestId('count-value')).toHaveTextContent('0');
+  await expectCountToBe(0);
 });
 
 test('increment, decrement, and reset buttons update the count (default step=1)', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp();
 
-  const count = screen.getByTestId('count-value');
   const incrementBtn = screen.getByRole('button', { name: /increment/i });
   const decrementBtn = screen.getByRole('button', { name: /decrement/i });
   const resetBtn = screen.getByRole('button', { name: /reset/i });
 
-  expect(count).toHaveTextContent('0');
+  await expectCountToBe(0);
 
   await user.click(incrementBtn);
   await user.click(incrementBtn);
-  expect(count).toHaveTextContent('2');
+  await expectCountToBe(2);
 
   await user.click(decrementBtn);
-  expect(count).toHaveTextContent('1');
+  await expectCountToBe(1);
 
   await user.click(resetBtn);
-  expect(count).toHaveTextContent('0');
+  await expectCountToBe(0);
 });
 
 test('step value affects increment/decrement', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp();
 
-  const count = screen.getByTestId('count-value');
   const stepInput = screen.getByLabelText(/step value/i);
+  const incrementBtn = screen.getByRole('button', { name: /increment/i });
+  const decrementBtn = screen.getByRole('button', { name: /decrement/i });
 
+  await expectCountToBe(0);
+
+  // Ensure we fully replace any existing value (robust across browsers/JSDOM).
   await user.clear(stepInput);
   await user.type(stepInput, '5');
 
-  await user.click(screen.getByRole('button', { name: /increment/i }));
-  expect(count).toHaveTextContent('5');
+  await user.click(incrementBtn);
+  await expectCountToBe(5);
 
-  await user.click(screen.getByRole('button', { name: /decrement/i }));
-  expect(count).toHaveTextContent('0');
+  await user.click(decrementBtn);
+  await expectCountToBe(0);
 });
 
 test('disabling negative values prevents count from going below zero', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp();
 
-  const count = screen.getByTestId('count-value');
   const allowNegativeToggle = screen.getByRole('switch', { name: /allow negative values/i });
   const decrementBtn = screen.getByRole('button', { name: /decrement/i });
+
+  await expectCountToBe(0);
 
   // turn OFF allow negative
   await user.click(allowNegativeToggle);
 
   await user.click(decrementBtn);
-  expect(count).toHaveTextContent('0');
+  await expectCountToBe(0);
 });
 
 test('undo and redo work for counter changes', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp();
 
-  const count = screen.getByTestId('count-value');
   const incrementBtn = screen.getByRole('button', { name: /increment/i });
   const undoBtn = screen.getByRole('button', { name: /undo last action/i });
   const redoBtn = screen.getByRole('button', { name: /redo last action/i });
 
   await user.click(incrementBtn);
   await user.click(incrementBtn);
-  expect(count).toHaveTextContent('2');
+  await expectCountToBe(2);
 
   await user.click(undoBtn);
-  expect(count).toHaveTextContent('1');
+  await expectCountToBe(1);
 
   await user.click(redoBtn);
-  expect(count).toHaveTextContent('2');
+  await expectCountToBe(2);
 });
 
 test('theme toggle updates label', async () => {
   const user = userEvent.setup();
-  render(<App />);
+  renderApp();
 
   const themeBtn = screen.getByRole('button', { name: /toggle theme/i });
   expect(themeBtn).toHaveTextContent(/light|dark/i);
 
   const before = themeBtn.textContent;
   await user.click(themeBtn);
-  expect(themeBtn.textContent).not.toEqual(before);
+
+  await waitFor(() => {
+    expect(themeBtn.textContent).not.toEqual(before);
+  });
 });
