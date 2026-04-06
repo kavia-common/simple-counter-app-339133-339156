@@ -191,6 +191,7 @@ export function counterReducer(state, action) {
     }
 
     case 'counter/reset': {
+      // Count-only reset (kept for backwards compatibility).
       const prevCount = state.count;
       const nextCount = applyNoNegativeGuard(0, state.allowNegative);
 
@@ -211,15 +212,66 @@ export function counterReducer(state, action) {
       };
     }
 
+    case 'counter/resetAll': {
+      /**
+       * Full application reset.
+       *
+       * Contract:
+       * - Inputs: none
+       * - Outputs: CounterState reset to defaults, with undo enabling return to the pre-reset state
+       * - Errors: never throws
+       * - Side effects: none
+       *
+       * Invariants:
+       * - After resetAll, step=1, allowNegative=true, theme='light', history cleared, future cleared.
+       * - Undo returns to the state prior to resetAll.
+       */
+      const defaults = getDefaultCounterState();
+
+      // Store a snapshot of the previous state for undo.
+      // (We only need to support undoing core values; redo will restore by replaying future snapshots.)
+      const snapshot = {
+        count: state.count,
+        step: state.step,
+        allowNegative: state.allowNegative,
+        theme: state.theme,
+        history: state.history,
+      };
+
+      return {
+        ...defaults,
+        past: [...state.past, snapshot],
+        future: [],
+        lastChange: { type: 'resetAll', direction: 'neutral', at: nowIso() },
+      };
+    }
+
     case 'counter/undo': {
       if (!state.past.length) return state;
       const previous = state.past[state.past.length - 1];
 
+      // Backwards compatible: older entries may only have {count}.
+      const restore = {
+        count: previous.count,
+        step: previous.step ?? state.step,
+        allowNegative: previous.allowNegative ?? state.allowNegative,
+        theme: previous.theme ?? state.theme,
+        history: previous.history ?? state.history,
+      };
+
+      const futureSnapshot = {
+        count: state.count,
+        step: state.step,
+        allowNegative: state.allowNegative,
+        theme: state.theme,
+        history: state.history,
+      };
+
       return {
         ...state,
         past: state.past.slice(0, -1),
-        future: [{ count: state.count }, ...state.future],
-        count: previous.count,
+        future: [futureSnapshot, ...state.future],
+        ...restore,
         lastChange: { type: 'undo', direction: 'neutral', at: nowIso() },
       };
     }
@@ -228,11 +280,27 @@ export function counterReducer(state, action) {
       if (!state.future.length) return state;
       const next = state.future[0];
 
+      const redoRestore = {
+        count: next.count,
+        step: next.step ?? state.step,
+        allowNegative: next.allowNegative ?? state.allowNegative,
+        theme: next.theme ?? state.theme,
+        history: next.history ?? state.history,
+      };
+
+      const pastSnapshot = {
+        count: state.count,
+        step: state.step,
+        allowNegative: state.allowNegative,
+        theme: state.theme,
+        history: state.history,
+      };
+
       return {
         ...state,
-        past: [...state.past, { count: state.count }],
+        past: [...state.past, pastSnapshot],
         future: state.future.slice(1),
-        count: next.count,
+        ...redoRestore,
         lastChange: { type: 'redo', direction: 'neutral', at: nowIso() },
       };
     }

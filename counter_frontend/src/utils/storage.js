@@ -48,3 +48,22 @@ export function saveAppState(state) {
     return { ok: false, error: err instanceof Error ? err : new Error('Failed to save state') };
   }
 }
+
+// PUBLIC_INTERFACE
+export function clearAppState() {
+  /**
+   * Clears the persisted application state from localStorage.
+   *
+   * Contract:
+   * - Inputs: none
+   * - Outputs: { ok: boolean, error: Error|null }
+   * - Errors: never throws; returns {error} when removal fails
+   * - Side effects: removes the app storage key from localStorage
+   */
+  try {
+    window.localStorage.removeItem(APP_STORAGE_KEY);
+    return { ok: true, error: null };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err : new Error('Failed to clear state') };
+  }
+}

@@ -9,7 +9,7 @@ import {
   getPersistableState,
   sanitizePersistedState,
 } from './flows/counterFlow';
-import { loadAppState, saveAppState } from './utils/storage';
+import { clearAppState, loadAppState, saveAppState } from './utils/storage';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 function useStableHandlers(handlers) {
@@ -82,7 +82,12 @@ function App() {
   const decrement = useCallback(() => dispatch({ type: 'counter/decrement' }), []);
 
   // PUBLIC_INTERFACE
-  const reset = useCallback(() => dispatch({ type: 'counter/reset' }), []);
+  const reset = useCallback(() => {
+    // Reset is defined as a full app reset (count + preferences + history + undo/redo).
+    // We clear persistence first to avoid briefly persisting an intermediate/stale state.
+    clearAppState();
+    dispatch({ type: 'counter/resetAll' });
+  }, []);
 
   // PUBLIC_INTERFACE
   const undo = useCallback(() => dispatch({ type: 'counter/undo' }), []);
