@@ -88,7 +88,8 @@ function deepFreezeDev(obj) {
 function makeUndoSnapshot(state) {
   const snapshot = {
     count: state.count,
-    step: state.step,
+    // Enforce numeric step in snapshots even if a UI bug or persisted blob ever supplies a string.
+    step: sanitizeStep(state.step),
     allowNegative: state.allowNegative,
     theme: state.theme,
     // Clone arrays so snapshots can't be affected by later changes.
@@ -188,20 +189,24 @@ export function counterReducer(state, action) {
 
     case 'counter/increment': {
       const prevCount = state.count;
-      const nextCount = applyNoNegativeGuard(prevCount + state.step, state.allowNegative);
+      const step = sanitizeStep(state.step);
+      const nextCount = applyNoNegativeGuard(prevCount + step, state.allowNegative);
 
       const entry = makeHistoryEntry({
         type: 'increment',
         prevCount,
         nextCount,
-        step: state.step,
+        step,
       });
 
       return {
         ...state,
+        // Store snapshot of *current* state, but with a numeric step (handled inside makeUndoSnapshot).
         past: [...state.past, makeUndoSnapshot(state)],
         future: [],
         count: nextCount,
+        // Keep state.step numeric going forward.
+        step,
         history: pushHistory(state.history, entry),
         lastChange: { type: 'increment', direction: 'up', at: entry.timestamp },
       };
@@ -209,13 +214,15 @@ export function counterReducer(state, action) {
 
     case 'counter/decrement': {
       const prevCount = state.count;
-      const nextCount = applyNoNegativeGuard(prevCount - state.step, state.allowNegative);
+      const step = sanitizeStep(state.step);
+      const nextCount = applyNoNegativeGuard(prevCount - step, state.allowNegative);
 
       // If no-negative is enabled and we are already at 0, keep behavior deterministic:
       // still record the action (attempt) only if it changes value.
       if (nextCount === prevCount) {
         return {
           ...state,
+          step,
           lastChange: { type: 'decrement', direction: 'neutral', at: nowIso() },
         };
       }
@@ -224,7 +231,7 @@ export function counterReducer(state, action) {
         type: 'decrement',
         prevCount,
         nextCount,
-        step: state.step,
+        step,
       });
 
       return {
@@ -232,6 +239,7 @@ export function counterReducer(state, action) {
         past: [...state.past, makeUndoSnapshot(state)],
         future: [],
         count: nextCount,
+        step,
         history: pushHistory(state.history, entry),
         lastChange: { type: 'decrement', direction: 'down', at: entry.timestamp },
       };
@@ -298,6 +306,8 @@ export function counterReducer(state, action) {
         past: state.past.slice(0, -1),
         future: [futureSnapshot, ...state.future],
         ...previous,
+        // Ensure restored step is numeric and invariant-compliant even if snapshot was polluted.
+        step: sanitizeStep(previous.step),
         lastChange: { type: 'undo', direction: 'neutral', at: nowIso() },
       };
     }
@@ -313,6 +323,7 @@ export function counterReducer(state, action) {
         past: [...state.past, pastSnapshot],
         future: state.future.slice(1),
         ...next,
+        step: sanitizeStep(next.step),
         lastChange: { type: 'redo', direction: 'neutral', at: nowIso() },
       };
     }

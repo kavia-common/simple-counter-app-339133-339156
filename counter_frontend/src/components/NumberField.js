@@ -6,6 +6,14 @@ function toNumberOrEmpty(value) {
   return Number.isFinite(n) ? n : '';
 }
 
+function parseNumberInputValue(raw) {
+  // Keep the field controllable while enforcing numeric values to consumers.
+  // For <input type="number">, an empty string is a valid "no value" state during editing.
+  if (raw === '') return '';
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : '';
+}
+
 // PUBLIC_INTERFACE
 export function NumberField({
   id: idProp,
@@ -17,7 +25,7 @@ export function NumberField({
   inputMode = 'numeric',
   helpText,
 }) {
-  /** Accessible number input field with consistent styling. */
+  /** Accessible number input field with consistent styling. Emits numbers (or empty string) via onChange. */
   const autoId = useId();
   const id = idProp || autoId;
 
@@ -42,7 +50,7 @@ export function NumberField({
         min={min}
         step={step}
         aria-describedby={helpText ? `${id}-help` : undefined}
-        onChange={(e) => onChange?.(e.target.value)}
+        onChange={(e) => onChange?.(parseNumberInputValue(e.target.value))}
       />
     </div>
   );
