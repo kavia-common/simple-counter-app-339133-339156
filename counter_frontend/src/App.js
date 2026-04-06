@@ -47,6 +47,21 @@ function App() {
 
   // Persist key preferences & values.
   useEffect(() => {
+    /**
+     * Persistence contract:
+     * - For normal updates, persist the current state subset.
+     * - For a full reset (resetAll), clear localStorage and DO NOT save in the same tick.
+     *
+     * Rationale:
+     * React 18 batches updates/effects; clearing storage in the click handler can race with the
+     * effect that saves state, causing stale/incorrect data to be re-persisted. Handling reset
+     * atomically here guarantees deterministic reset + undo/redo semantics.
+     */
+    if (state.lastChange?.type === 'resetAll') {
+      clearAppState();
+      return;
+    }
+
     const persistable = getPersistableState(state);
     saveAppState(persistable);
   }, [state]);
@@ -84,8 +99,7 @@ function App() {
   // PUBLIC_INTERFACE
   const reset = useCallback(() => {
     // Reset is defined as a full app reset (count + preferences + history + undo/redo).
-    // We clear persistence first to avoid briefly persisting an intermediate/stale state.
-    clearAppState();
+    // Persistence clearing is handled atomically in the persistence effect to avoid timing races.
     dispatch({ type: 'counter/resetAll' });
   }, []);
 
