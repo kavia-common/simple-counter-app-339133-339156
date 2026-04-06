@@ -58,14 +58,44 @@ function makeHistoryEntry({ type, prevCount, nextCount, step }) {
  * - All snapshots have the same shape so undo/redo restore is deterministic across action types.
  * - `past` and `future` are intentionally excluded to avoid deep/recursive structures.
  */
+function deepFreezeDev(obj) {
+  // Defensive helper: catch accidental snapshot mutations during development/tests.
+  // In production this is a no-op (no runtime cost).
+  if (process.env.NODE_ENV === 'production' || !obj || typeof obj !== 'object') return obj;
+  Object.freeze(obj);
+  for (const key of Object.keys(obj)) {
+    const value = obj[key];
+    if (value && typeof value === 'object' && !Object.isFrozen(value)) {
+      deepFreezeDev(value);
+    }
+  }
+  return obj;
+}
+
+/**
+ * Creates a snapshot suitable for undo/redo.
+ *
+ * Contract:
+ * - Inputs: current CounterState
+ * - Outputs: plain snapshot object that is safe to store in history stacks
+ * - Errors: none
+ * - Side effects: none (dev-only deepFreeze to prevent accidental mutation)
+ *
+ * Invariants:
+ * - Snapshot must be immutable-by-convention: no references that can be mutated later.
+ * - `past` and `future` are excluded to avoid recursive structures.
+ */
 function makeUndoSnapshot(state) {
-  return {
+  const snapshot = {
     count: state.count,
     step: state.step,
     allowNegative: state.allowNegative,
     theme: state.theme,
-    history: state.history,
+    // Clone arrays so snapshots can't be affected by later changes.
+    history: Array.isArray(state.history) ? state.history.slice() : [],
   };
+
+  return deepFreezeDev(snapshot);
 }
 
 // PUBLIC_INTERFACE
