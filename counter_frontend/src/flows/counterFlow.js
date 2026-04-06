@@ -51,6 +51,23 @@ function makeHistoryEntry({ type, prevCount, nextCount, step }) {
   };
 }
 
+/**
+ * Creates a snapshot suitable for undo/redo.
+ *
+ * Invariant:
+ * - All snapshots have the same shape so undo/redo restore is deterministic across action types.
+ * - `past` and `future` are intentionally excluded to avoid deep/recursive structures.
+ */
+function makeUndoSnapshot(state) {
+  return {
+    count: state.count,
+    step: state.step,
+    allowNegative: state.allowNegative,
+    theme: state.theme,
+    history: state.history,
+  };
+}
+
 // PUBLIC_INTERFACE
 export function getDefaultCounterState() {
   /**
@@ -152,7 +169,7 @@ export function counterReducer(state, action) {
 
       return {
         ...state,
-        past: [...state.past, { count: prevCount }],
+        past: [...state.past, makeUndoSnapshot(state)],
         future: [],
         count: nextCount,
         history: pushHistory(state.history, entry),
@@ -182,7 +199,7 @@ export function counterReducer(state, action) {
 
       return {
         ...state,
-        past: [...state.past, { count: prevCount }],
+        past: [...state.past, makeUndoSnapshot(state)],
         future: [],
         count: nextCount,
         history: pushHistory(state.history, entry),
@@ -204,7 +221,7 @@ export function counterReducer(state, action) {
 
       return {
         ...state,
-        past: [...state.past, { count: prevCount }],
+        past: [...state.past, makeUndoSnapshot(state)],
         future: [],
         count: nextCount,
         history: pushHistory(state.history, entry),
@@ -229,14 +246,8 @@ export function counterReducer(state, action) {
       const defaults = getDefaultCounterState();
 
       // Store a snapshot of the previous state for undo.
-      // (We only need to support undoing core values; redo will restore by replaying future snapshots.)
-      const snapshot = {
-        count: state.count,
-        step: state.step,
-        allowNegative: state.allowNegative,
-        theme: state.theme,
-        history: state.history,
-      };
+      // Snapshot contract is unified across all actions via makeUndoSnapshot().
+      const snapshot = makeUndoSnapshot(state);
 
       return {
         ...defaults,
@@ -250,28 +261,13 @@ export function counterReducer(state, action) {
       if (!state.past.length) return state;
       const previous = state.past[state.past.length - 1];
 
-      // Backwards compatible: older entries may only have {count}.
-      const restore = {
-        count: previous.count,
-        step: previous.step ?? state.step,
-        allowNegative: previous.allowNegative ?? state.allowNegative,
-        theme: previous.theme ?? state.theme,
-        history: previous.history ?? state.history,
-      };
-
-      const futureSnapshot = {
-        count: state.count,
-        step: state.step,
-        allowNegative: state.allowNegative,
-        theme: state.theme,
-        history: state.history,
-      };
+      const futureSnapshot = makeUndoSnapshot(state);
 
       return {
         ...state,
         past: state.past.slice(0, -1),
         future: [futureSnapshot, ...state.future],
-        ...restore,
+        ...previous,
         lastChange: { type: 'undo', direction: 'neutral', at: nowIso() },
       };
     }
@@ -280,27 +276,13 @@ export function counterReducer(state, action) {
       if (!state.future.length) return state;
       const next = state.future[0];
 
-      const redoRestore = {
-        count: next.count,
-        step: next.step ?? state.step,
-        allowNegative: next.allowNegative ?? state.allowNegative,
-        theme: next.theme ?? state.theme,
-        history: next.history ?? state.history,
-      };
-
-      const pastSnapshot = {
-        count: state.count,
-        step: state.step,
-        allowNegative: state.allowNegative,
-        theme: state.theme,
-        history: state.history,
-      };
+      const pastSnapshot = makeUndoSnapshot(state);
 
       return {
         ...state,
         past: [...state.past, pastSnapshot],
         future: state.future.slice(1),
-        ...redoRestore,
+        ...next,
         lastChange: { type: 'redo', direction: 'neutral', at: nowIso() },
       };
     }
